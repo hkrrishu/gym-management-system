@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GymPulse Check-in — Scan your QR code to mark attendance at the gym.">
+  <title>Check-in — GymPulse</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 
+    Check-in page uses a standalone layout (no nav/footer).
+    This page will be shown on a tablet at the gym entrance
+    for members to scan their QR code and mark attendance.
+  -->
+
+  <main class="checkin-container" id="checkin-page">
+    <div class="checkin-card">
+
+      <div class="checkin-card__logo" aria-hidden="true">G</div>
+
+      <h1 class="checkin-card__title">Welcome to GymPulse</h1>
+      <p class="checkin-card__description">
+        Scan your QR code below to mark your attendance.
+      </p>
+
+      <!-- QR Scanner Placeholder -->
+      <div
+        id="qr-scanner-area"
+        style="
+          width: 100%;
+          aspect-ratio: 1;
+          max-width: 280px;
+          margin: 0 auto var(--space-6);
+          background: var(--color-gray-100);
+          border: 2px dashed var(--color-gray-300);
+          border-radius: var(--radius-lg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: var(--space-3);
+        "
+        aria-label="QR code scanner area"
+      >
+        <span style="font-size: 2.5rem; opacity: 0.3;">📷</span>
+        <p class="text-sm text-muted" style="padding: 0 var(--space-4);">
+          QR scanner will be activated once connected.
+        </p>
+      </div>
+
+      <p class="text-xs text-muted">
+        Having trouble? Ask the front desk for help.
+      </p>
+
+    </div>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

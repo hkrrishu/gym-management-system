@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GymPulse Admin Dashboard — Overview of gym stats, attendance, and membership status.">
+  <title>Dashboard — GymPulse</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Navigation -->
+    <nav class="nav" aria-label="Main navigation">
+      <div class="container nav__inner">
+        <a href="index.html" class="nav__brand" id="nav-brand">
+          <div class="nav__logo" aria-hidden="true">G</div>
+          <span class="nav__brand-name">GymPulse</span>
+        </a>
+
+        <button
+          class="nav__toggle"
+          id="nav-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded="false"
+          aria-controls="nav-links"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <div class="nav__links" id="nav-links" role="menubar">
+          <a href="index.html" class="nav__link" role="menuitem">Home</a>
+          <a href="admin.html" class="nav__link" role="menuitem">Dashboard</a>
+          <a href="members.html" class="nav__link" role="menuitem">Members</a>
+          <a href="check-in.html" class="nav__link" role="menuitem">Check-in</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="page__content">
+      <div class="container">
+
+        <!-- Page Header -->
+        <header class="page-header">
+          <div class="page-header__row">
+            <div>
+              <h1 class="page-header__title">Dashboard</h1>
+              <p class="page-header__subtitle">Here's what's happening at your gym today.</p>
+            </div>
+            <a href="add-member.html" class="btn btn--primary" id="btn-add-member">
+              + Add Member
+            </a>
+          </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <section class="stats-grid mb-6" aria-label="Gym statistics">
+          <div class="stat-card" id="stat-total-members">
+            <p class="stat-card__label">Total Members</p>
+            <p class="stat-card__value">127</p>
+            <p class="stat-card__change">All registered members</p>
+          </div>
+          <div class="stat-card" id="stat-active-members">
+            <p class="stat-card__label">Active Members</p>
+            <p class="stat-card__value">103</p>
+            <p class="stat-card__change">Currently active</p>
+          </div>
+          <div class="stat-card" id="stat-expiring-soon">
+            <p class="stat-card__label">Expiring Soon</p>
+            <p class="stat-card__value">8</p>
+            <p class="stat-card__change">Within the next 7 days</p>
+          </div>
+          <div class="stat-card" id="stat-checkins-today">
+            <p class="stat-card__label">Check-ins Today</p>
+            <p class="stat-card__value">47</p>
+            <p class="stat-card__change">Attendance recorded today</p>
+          </div>
+        </section>
+
+        <!-- Dashboard Content Grid -->
+        <div class="dashboard-grid">
+
+          <!-- Today's Attendance (primary column) -->
+          <section class="card dashboard-grid__main" aria-label="Today's attendance">
+            <div class="card__header flex items-center justify-between">
+              <div>
+                <h2 class="card__title">Today's Attendance</h2>
+                <p class="card__description">Members who checked in today.</p>
+              </div>
+              <a href="members.html" class="btn btn--ghost btn--sm" id="link-view-attendance">View All →</a>
+            </div>
+
+            <div class="list" id="attendance-list">
+              <div class="list__item">
+                <div class="flex items-center gap-4">
+                  <div class="avatar avatar--sm" aria-hidden="true">RK</div>
+                  <span class="list__item-name">Rahul Kumar</span>
+                </div>
+                <span class="list__item-meta">6:42 PM</span>
+              </div>
+              <div class="list__item">
+                <div class="flex items-center gap-4">
+                  <div class="avatar avatar--sm" aria-hidden="true">AS</div>
+                  <span class="list__item-name">Aman Singh</span>
+                </div>
+                <span class="list__item-meta">6:51 PM</span>
+              </div>
+              <div class="list__item">
+                <div class="flex items-center gap-4">
+                  <div class="avatar avatar--sm" aria-hidden="true">RS</div>
+                  <span class="list__item-name">Rohit Sharma</span>
+                </div>
+                <span class="list__item-meta">7:03 PM</span>
+              </div>
+              <div class="list__item">
+                <div class="flex items-center gap-4">
+                  <div class="avatar avatar--sm" aria-hidden="true">AS</div>
+                  <span class="list__item-name">Arjun Singh</span>
+                </div>
+                <span class="list__item-meta">7:18 PM</span>
+              </div>
+              <div class="list__item">
+                <div class="flex items-center gap-4">
+                  <div class="avatar avatar--sm" aria-hidden="true">VK</div>
+                  <span class="list__item-name">Vikas Kumar</span>
+                </div>
+                <span class="list__item-meta">7:26 PM</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Sidebar column -->
+          <div class="dashboard-grid__side">
+
+            <!-- Expiring Soon -->
+            <section class="card" aria-label="Expiring memberships">
+              <div class="card__header flex items-center justify-between">
+                <div>
+                  <h2 class="card__title">Expiring Soon</h2>
+                  <p class="card__description">Memberships ending within 7 days.</p>
+                </div>
+                <a href="members.html" class="btn btn--ghost btn--sm" id="link-view-expiring">View Members →</a>
+              </div>
+
+              <div class="list" id="expiring-list">
+                <div class="list__item">
+                  <div class="flex items-center gap-4">
+                    <div class="avatar avatar--sm" aria-hidden="true">RK</div>
+                    <span class="list__item-name">Rahul Kumar</span>
+                  </div>
+                  <span class="badge badge--warning">3 days</span>
+                </div>
+                <div class="list__item">
+                  <div class="flex items-center gap-4">
+                    <div class="avatar avatar--sm" aria-hidden="true">AS</div>
+                    <span class="list__item-name">Aman Singh</span>
+                  </div>
+                  <span class="badge badge--warning">5 days</span>
+                </div>
+                <div class="list__item">
+                  <div class="flex items-center gap-4">
+                    <div class="avatar avatar--sm" aria-hidden="true">RS</div>
+                    <span class="list__item-name">Rohit Sharma</span>
+                  </div>
+                  <span class="badge badge--neutral">7 days</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Recently Added -->
+            <section class="card" aria-label="Recently added members">
+              <div class="card__header flex items-center justify-between">
+                <div>
+                  <h2 class="card__title">Recently Added</h2>
+                  <p class="card__description">Latest members added to the gym.</p>
+                </div>
+                <a href="members.html" class="btn btn--ghost btn--sm" id="link-view-all-members">View All Members →</a>
+              </div>
+
+              <div class="list" id="recent-members-list">
+                <div class="list__item">
+                  <div class="flex items-center gap-4">
+                    <div class="avatar avatar--sm" aria-hidden="true">PS</div>
+                    <span class="list__item-name">Priya Sharma</span>
+                  </div>
+                  <span class="list__item-meta">22 Sep 2026</span>
+                </div>
+                <div class="list__item">
+                  <div class="flex items-center gap-4">
+                    <div class="avatar avatar--sm" aria-hidden="true">AS</div>
+                    <span class="list__item-name">Arjun Singh</span>
+                  </div>
+                  <span class="list__item-meta">20 Sep 2026</span>
+                </div>
+                <div class="list__item">
+                  <div class="flex items-center gap-4">
+                    <div class="avatar avatar--sm" aria-hidden="true">VK</div>
+                    <span class="list__item-name">Vikas Kumar</span>
+                  </div>
+                  <span class="list__item-meta">18 Sep 2026</span>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container footer__inner">
+        <p class="footer__text">&copy; 2026 GymPulse. All rights reserved.</p>
+        <p class="footer__text">Built for local gyms.</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

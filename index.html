@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GymPulse — Modern gym management system for tracking members, attendance, and memberships.">
+  <title>GymPulse — Gym Management System</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Navigation -->
+    <nav class="nav" aria-label="Main navigation">
+      <div class="container nav__inner">
+        <a href="index.html" class="nav__brand" id="nav-brand">
+          <div class="nav__logo" aria-hidden="true">G</div>
+          <span class="nav__brand-name">GymPulse</span>
+        </a>
+
+        <button
+          class="nav__toggle"
+          id="nav-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded="false"
+          aria-controls="nav-links"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <div class="nav__links" id="nav-links" role="menubar">
+          <a href="index.html" class="nav__link" role="menuitem">Home</a>
+          <a href="admin.html" class="nav__link" role="menuitem">Dashboard</a>
+          <a href="members.html" class="nav__link" role="menuitem">Members</a>
+          <a href="check-in.html" class="nav__link" role="menuitem">Check-in</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <main class="hero" id="hero">
+      <div class="hero__content">
+        <div class="hero__badge" aria-hidden="true">⚡ Gym Management</div>
+        <h1 class="hero__title">
+          Manage your gym<br>with <span>GymPulse</span>
+        </h1>
+        <p class="hero__description">
+          Track members, monitor attendance, and manage memberships — all from one clean, simple dashboard.
+        </p>
+        <div class="hero__actions">
+          <a href="admin.html" class="btn btn--primary btn--lg" id="btn-get-started">
+            Open Dashboard
+          </a>
+          <a href="check-in.html" class="btn btn--outline btn--lg" id="btn-checkin">
+            Member Check-in
+          </a>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container footer__inner">
+        <p class="footer__text">&copy; 2026 GymPulse. All rights reserved.</p>
+        <p class="footer__text">Built for local gyms.</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

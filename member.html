@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GymPulse — Member profile, membership details, and attendance history.">
+  <title>Member Profile — GymPulse</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Navigation -->
+    <nav class="nav" aria-label="Main navigation">
+      <div class="container nav__inner">
+        <a href="index.html" class="nav__brand" id="nav-brand">
+          <div class="nav__logo" aria-hidden="true">G</div>
+          <span class="nav__brand-name">GymPulse</span>
+        </a>
+
+        <button
+          class="nav__toggle"
+          id="nav-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded="false"
+          aria-controls="nav-links"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <div class="nav__links" id="nav-links" role="menubar">
+          <a href="index.html" class="nav__link" role="menuitem">Home</a>
+          <a href="admin.html" class="nav__link" role="menuitem">Dashboard</a>
+          <a href="members.html" class="nav__link" role="menuitem">Members</a>
+          <a href="check-in.html" class="nav__link" role="menuitem">Check-in</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="page__content">
+      <div class="container container--narrow">
+
+        <!-- Back Link -->
+        <div class="mb-6">
+          <a href="members.html" class="btn btn--ghost btn--sm" id="btn-back-members">
+            ← Back to Members
+          </a>
+        </div>
+
+        <!-- Member Header -->
+        <header class="card mb-6" id="member-header">
+          <div class="flex items-center gap-6" style="flex-wrap: wrap;">
+            <div class="avatar avatar--xl" id="member-avatar" aria-hidden="true">?</div>
+            <div style="flex: 1;">
+              <h1 class="page-header__title" id="member-name">Member Profile</h1>
+              <p class="page-header__subtitle" id="member-contact">Profile details will load from the database.</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn--outline btn--sm" id="btn-edit-member" disabled>Edit</button>
+              <button class="btn btn--danger btn--sm" id="btn-delete-member" disabled>Delete</button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Membership Info -->
+        <section class="card mb-6" aria-label="Membership information">
+          <div class="card__header">
+            <h2 class="card__title">Membership</h2>
+            <p class="card__description">Current plan and membership status.</p>
+          </div>
+
+          <div class="empty-state" id="membership-empty">
+            <div class="empty-state__icon">📄</div>
+            <h3 class="empty-state__title">No membership data</h3>
+            <p class="empty-state__description">
+              Membership details will appear here once connected to the database.
+            </p>
+          </div>
+        </section>
+
+        <!-- Attendance History -->
+        <section class="card" aria-label="Attendance history">
+          <div class="card__header">
+            <h2 class="card__title">Attendance History</h2>
+            <p class="card__description">Recent check-in records for this member.</p>
+          </div>
+
+          <div class="empty-state" id="attendance-empty">
+            <div class="empty-state__icon">📅</div>
+            <h3 class="empty-state__title">No attendance records</h3>
+            <p class="empty-state__description">
+              Check-in history will appear here once the attendance system is connected.
+            </p>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container footer__inner">
+        <p class="footer__text">&copy; 2026 GymPulse. All rights reserved.</p>
+        <p class="footer__text">Built for local gyms.</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
