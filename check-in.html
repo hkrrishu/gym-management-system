@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,55 +8,247 @@
   <title>Check-in — GymPulse</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
   <!-- 
     Check-in page uses a standalone layout (no nav/footer).
-    This page will be shown on a tablet at the gym entrance
-    for members to scan their QR code and mark attendance.
+    This page is shown when a user scans the public QR code.
   -->
-
   <main class="checkin-container" id="checkin-page">
     <div class="checkin-card">
 
-      <div class="checkin-card__logo" aria-hidden="true">G</div>
-
-      <h1 class="checkin-card__title">Welcome to GymPulse</h1>
-      <p class="checkin-card__description">
-        Scan your QR code below to mark your attendance.
-      </p>
-
-      <!-- QR Scanner Placeholder -->
-      <div
-        id="qr-scanner-area"
-        style="
-          width: 100%;
-          aspect-ratio: 1;
-          max-width: 280px;
-          margin: 0 auto var(--space-6);
-          background: var(--color-gray-100);
-          border: 2px dashed var(--color-gray-300);
-          border-radius: var(--radius-lg);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          gap: var(--space-3);
-        "
-        aria-label="QR code scanner area"
-      >
-        <span style="font-size: 2.5rem; opacity: 0.3;">📷</span>
-        <p class="text-sm text-muted" style="padding: 0 var(--space-4);">
-          QR scanner will be activated once connected.
+      <!-- Header State -->
+      <div id="checkin-header">
+        <div class="checkin-card__logo" aria-hidden="true">G</div>
+        <h1 class="checkin-card__title">Member Check-in</h1>
+        <p class="checkin-card__description">
+          Enter your registered phone number to check in.
         </p>
       </div>
 
-      <p class="text-xs text-muted">
-        Having trouble? Ask the front desk for help.
-      </p>
+      <!-- Search State -->
+      <div id="checkin-search-state">
+        <div class="form-group mb-6">
+          <input type="tel" class="form-input" id="phone-input" placeholder="e.g. 9876543210" maxlength="10"
+            pattern="[0-9]{10}" aria-label="Phone number"
+            style="text-align: center; font-size: var(--font-size-lg); letter-spacing: 2px;">
+          <div id="search-error" class="form-error"
+            style="display: none; text-align: center; margin-top: var(--space-3);"></div>
+        </div>
+
+        <button class="btn btn--primary btn--full btn--lg" id="btn-find-member">
+          Find My Membership
+        </button>
+
+        <p class="text-xs text-muted text-center mt-6">
+          Your phone number is only used to securely find your active gym membership.
+        </p>
+      </div>
+
+      <!-- Result State -->
+      <div id="checkin-result-state" style="display: none;">
+
+        <div class="card mb-6" style="text-align: center;">
+          <div class="avatar avatar--xl" id="result-avatar" aria-hidden="true" style="margin: 0 auto var(--space-4);">?
+          </div>
+          <h2 class="card__title" id="result-name">Member Name</h2>
+          <p class="text-secondary mb-4" id="result-phone">XXXXXX1234</p>
+
+          <div class="mb-4">
+            <span class="badge" id="result-badge">Status</span>
+          </div>
+
+          <div class="text-sm text-secondary mb-2">
+            Expires on: <span id="result-expiry" style="color: var(--text-primary); font-weight: 500;">-</span>
+          </div>
+          <div class="text-sm text-secondary">
+            <span id="result-days">-</span>
+          </div>
+        </div>
+
+        <div id="action-area">
+          <button class="btn btn--primary btn--full btn--lg" id="btn-mark-present">
+            Mark Present
+          </button>
+        </div>
+
+        <div id="expired-area" style="display: none; text-align: center;" class="mb-6">
+          <p class="text-sm" style="color: var(--color-danger);">Your membership has expired.</p>
+          <p class="text-xs text-secondary mt-2">Please contact the gym owner for renewal.</p>
+        </div>
+
+        <div id="already-checked-in-area" style="display: none; text-align: center;" class="mb-6">
+          <p class="text-sm" style="color: hsl(38, 70%, 38%);">You have already checked in today.</p>
+        </div>
+
+        <div id="success-area" style="display: none; text-align: center;" class="mb-6">
+          <div style="font-size: 3rem; margin-bottom: var(--space-2);">✅</div>
+          <p style="color: var(--color-success); font-weight: 500;">Attendance marked successfully!</p>
+        </div>
+
+        <button class="btn btn--ghost btn--full mt-4" id="btn-back">
+          ← Back
+        </button>
+      </div>
 
     </div>
   </main>
 
+  <script type="module" src="js/supabase-client.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Demo Data
+      const demoMembers = [
+        { name: "Rahul Kumar", phone: "9876543210", expiryDate: "2026-09-22", status: "Expired" },
+        { name: "Aman Singh", phone: "9876543211", expiryDate: "2026-09-20", status: "Expired" },
+        { name: "Rohit Sharma", phone: "9876543212", expiryDate: "2026-10-18", status: "Active" },
+        { name: "Arjun Singh", phone: "9876543213", expiryDate: "2026-10-20", status: "Active" },
+        { name: "Vikas Kumar", phone: "9876543214", expiryDate: "2026-10-18", status: "Active" },
+        { name: "Priya Sharma", phone: "9876543215", expiryDate: "2027-09-22", status: "Active" },
+        { name: "Neha Gupta", phone: "9876543216", expiryDate: "2026-09-25", status: "Expiring Soon" },
+        { name: "Karan Singh", phone: "9876543217", expiryDate: "2026-09-28", status: "Expiring Soon" },
+        { name: "Saurabh Verma", phone: "9876543218", expiryDate: "2026-10-15", status: "Active" },
+        { name: "Anjali Singh", phone: "9876543219", expiryDate: "2026-09-05", status: "Expired" }
+      ];
+
+      const checkedInToday = new Set();
+      let currentMember = null;
+
+      const elements = {
+        searchState: document.getElementById('checkin-search-state'),
+        resultState: document.getElementById('checkin-result-state'),
+        phoneInput: document.getElementById('phone-input'),
+        btnFind: document.getElementById('btn-find-member'),
+        errorMsg: document.getElementById('search-error'),
+
+        avatar: document.getElementById('result-avatar'),
+        name: document.getElementById('result-name'),
+        phone: document.getElementById('result-phone'),
+        badge: document.getElementById('result-badge'),
+        expiry: document.getElementById('result-expiry'),
+        days: document.getElementById('result-days'),
+
+        actionArea: document.getElementById('action-area'),
+        btnMarkPresent: document.getElementById('btn-mark-present'),
+        expiredArea: document.getElementById('expired-area'),
+        successArea: document.getElementById('success-area'),
+        alreadyCheckedInArea: document.getElementById('already-checked-in-area'),
+        btnBack: document.getElementById('btn-back'),
+      };
+
+      function calculateDaysRemaining(expiryStr) {
+        const today = new Date('2026-09-25'); // Using fixed current date to match demo context
+        const expiry = new Date(expiryStr);
+        const diffTime = expiry - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+      }
+
+      function maskPhone(phone) {
+        if (!phone || phone.length !== 10) return phone;
+        return 'XXXXXX' + phone.slice(6);
+      }
+
+      function resetUI() {
+        elements.searchState.style.display = 'block';
+        elements.resultState.style.display = 'none';
+        elements.phoneInput.value = '';
+        elements.errorMsg.style.display = 'none';
+
+        elements.actionArea.style.display = 'none';
+        elements.expiredArea.style.display = 'none';
+        elements.successArea.style.display = 'none';
+        elements.alreadyCheckedInArea.style.display = 'none';
+      }
+
+      elements.btnFind.addEventListener('click', () => {
+        const phone = elements.phoneInput.value.trim();
+
+        if (!phone || phone.length !== 10 || !/^\d+$/.test(phone)) {
+          elements.errorMsg.textContent = 'Please enter a valid 10-digit phone number.';
+          elements.errorMsg.style.display = 'block';
+          return;
+        }
+
+        const member = demoMembers.find(m => m.phone === phone);
+
+        if (!member) {
+          elements.errorMsg.textContent = 'Membership not found for this number.';
+          elements.errorMsg.style.display = 'block';
+          return;
+        }
+
+        currentMember = member;
+
+        // Found member
+        elements.errorMsg.style.display = 'none';
+        elements.searchState.style.display = 'none';
+        elements.resultState.style.display = 'block';
+
+        // Populate card
+        elements.avatar.textContent = App.getInitials(member.name);
+        elements.name.textContent = member.name;
+        elements.phone.textContent = maskPhone(member.phone);
+        elements.expiry.textContent = App.formatDate(member.expiryDate);
+
+        const days = calculateDaysRemaining(member.expiryDate);
+        if (days < 0) {
+          elements.days.textContent = Math.abs(days) + ' days ago';
+        } else if (days === 0) {
+          elements.days.textContent = 'Expires today';
+        } else {
+          elements.days.textContent = days + ' days remaining';
+        }
+
+        elements.badge.textContent = member.status;
+        elements.badge.className = 'badge';
+        if (member.status === 'Active') elements.badge.classList.add('badge--success');
+        if (member.status === 'Expiring Soon') elements.badge.classList.add('badge--warning');
+        if (member.status === 'Expired') elements.badge.classList.add('badge--danger');
+
+        // Logic
+        elements.actionArea.style.display = 'none';
+        elements.expiredArea.style.display = 'none';
+        elements.successArea.style.display = 'none';
+        elements.alreadyCheckedInArea.style.display = 'none';
+
+        if (checkedInToday.has(member.phone)) {
+          elements.alreadyCheckedInArea.style.display = 'block';
+        } else if (member.status === 'Expired') {
+          elements.expiredArea.style.display = 'block';
+        } else {
+          elements.actionArea.style.display = 'block';
+        }
+      });
+
+      elements.btnMarkPresent.addEventListener('click', () => {
+        if (currentMember) {
+          checkedInToday.add(currentMember.phone);
+        }
+        elements.actionArea.style.display = 'none';
+        elements.successArea.style.display = 'block';
+
+        // Auto go back after 3 seconds
+        setTimeout(() => {
+          if (elements.successArea.style.display === 'block') {
+            resetUI();
+          }
+        }, 3000);
+      });
+
+      elements.btnBack.addEventListener('click', () => {
+        resetUI();
+      });
+
+      // Allow enter key
+      elements.phoneInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          elements.btnFind.click();
+        }
+      });
+    });
+  </script>
 </body>
+
 </html>

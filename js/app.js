@@ -115,19 +115,8 @@ const App = {
   /**
    * Initialize members page logic
    */
-  initMembersPage() {
-    this.demoMembers = [
-      { name: "Rahul Kumar", phone: "9876543210", plan: "3 Months", joinDate: "22 Jun 2026", expiryDate: "22 Sep 2026", status: "Expired" },
-      { name: "Aman Singh", phone: "9876543211", plan: "6 Months", joinDate: "20 Mar 2026", expiryDate: "20 Sep 2026", status: "Expired" },
-      { name: "Rohit Sharma", phone: "9876543212", plan: "3 Months", joinDate: "18 Jul 2026", expiryDate: "18 Oct 2026", status: "Active" },
-      { name: "Arjun Singh", phone: "9876543213", plan: "6 Months", joinDate: "20 Apr 2026", expiryDate: "20 Oct 2026", status: "Active" },
-      { name: "Vikas Kumar", phone: "9876543214", plan: "3 Months", joinDate: "18 Jul 2026", expiryDate: "18 Oct 2026", status: "Active" },
-      { name: "Priya Sharma", phone: "9876543215", plan: "12 Months", joinDate: "22 Sep 2026", expiryDate: "22 Sep 2027", status: "Active" },
-      { name: "Neha Gupta", phone: "9876543216", plan: "3 Months", joinDate: "25 Jun 2026", expiryDate: "25 Sep 2026", status: "Expiring Soon" },
-      { name: "Karan Singh", phone: "9876543217", plan: "3 Months", joinDate: "28 Jun 2026", expiryDate: "28 Sep 2026", status: "Expiring Soon" },
-      { name: "Saurabh Verma", phone: "9876543218", plan: "6 Months", joinDate: "15 Apr 2026", expiryDate: "15 Oct 2026", status: "Active" },
-      { name: "Anjali Singh", phone: "9876543219", plan: "1 Month", joinDate: "05 Aug 2026", expiryDate: "05 Sep 2026", status: "Expired" }
-    ];
+  async initMembersPage() {
+    this.demoMembers = []; // Will store real members now
 
     this.searchInput = document.getElementById('member-search');
     this.filterSelect = document.getElementById('member-filter-status');
@@ -136,10 +125,77 @@ const App = {
     this.emptyState = document.getElementById('members-empty');
     this.countText = document.getElementById('member-count-text');
 
-    this.renderMembers(this.demoMembers);
-
     this.searchInput.addEventListener('input', () => this.handleFilterMembers());
     this.filterSelect.addEventListener('change', () => this.handleFilterMembers());
+
+    await this.fetchMembers();
+  },
+
+  async fetchMembers() {
+    this.tableWrapper.style.display = 'none';
+    this.emptyState.style.display = 'block';
+    
+    const titleEl = this.emptyState.querySelector('.empty-state__title');
+    const descEl = this.emptyState.querySelector('.empty-state__description');
+    
+    titleEl.textContent = 'Loading members...';
+    descEl.textContent = 'Please wait while we fetch the members list.';
+
+    try {
+      const { data, error } = await window.supabaseClient.from('members').select('*');
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        titleEl.textContent = 'No members yet';
+        descEl.textContent = 'Add your first member to get started.';
+        this.countText.textContent = '0 members';
+        return;
+      }
+
+      // Map Supabase database columns to our frontend structure
+      this.demoMembers = data.map(row => ({
+        id: row.id,
+        name: row.name || 'Unknown',
+        phone: row.phone || '—',
+        plan: row.plan || row.plan_name || '—',
+        joinDate: this.formatDate(row.join_date || row.created_at || new Date()),
+        expiryDate: this.formatDate(row.expiry_date || row.expires_at || new Date()),
+        status: row.status || 'Active',
+        photoUrl: row.photo_url || null,
+        signedPhotoUrl: null
+      }));
+
+      // Generate signed URLs in a single batch request
+      const pathsToSign = this.demoMembers.filter(m => m.photoUrl).map(m => m.photoUrl);
+      if (pathsToSign.length > 0) {
+        const { data: signedUrls, error: signError } = await window.supabaseClient
+          .storage
+          .from('member_photos')
+          .createSignedUrls(pathsToSign, 60 * 60);
+
+        if (!signError && signedUrls) {
+          const urlMap = {};
+          signedUrls.forEach(item => {
+            if (!item.error && item.signedUrl) urlMap[item.path] = item.signedUrl;
+          });
+
+          this.demoMembers.forEach(m => {
+            if (m.photoUrl && urlMap[m.photoUrl]) {
+              m.signedPhotoUrl = urlMap[m.photoUrl];
+            }
+          });
+        }
+      }
+
+      // Initially render everything
+      this.handleFilterMembers();
+
+    } catch (err) {
+      titleEl.textContent = 'Failed to load members';
+      descEl.textContent = err.message || 'An error occurred while fetching data from the database.';
+      this.countText.textContent = 'Error';
+    }
   },
 
   handleFilterMembers() {
@@ -170,6 +226,8 @@ const App = {
     if (count === 0) {
       this.tableWrapper.style.display = 'none';
       this.emptyState.style.display = 'block';
+      this.emptyState.querySelector('.empty-state__title').textContent = 'No members found';
+      this.emptyState.querySelector('.empty-state__description').textContent = 'Try adjusting your search or filter.';
       this.tableBody.innerHTML = '';
       return;
     }
@@ -183,11 +241,18 @@ const App = {
       if (member.status === 'Expiring Soon') badgeClass = 'badge--warning';
       if (member.status === 'Expired') badgeClass = 'badge--danger';
 
+      let avatarHtml = `<div class="avatar avatar--sm" aria-hidden="true">${this.getInitials(member.name)}</div>`;
+      if (member.signedPhotoUrl) {
+        avatarHtml = `<div class="avatar avatar--sm" aria-hidden="true" style="padding: 0; overflow: hidden;">
+                        <img src="${member.signedPhotoUrl}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                      </div>`;
+      }
+
       return `
         <tr>
           <td data-label="Member">
             <div class="flex items-center gap-3" style="width: 100%;">
-              <div class="avatar avatar--sm" aria-hidden="true">${this.getInitials(member.name)}</div>
+              ${avatarHtml}
               <div class="flex items-center justify-between" style="flex: 1;">
                 <div style="font-weight: 500; color: var(--text-primary);">${member.name}</div>
                 <div class="mobile-status-badge"><span class="badge ${badgeClass}">${member.status}</span></div>
@@ -200,7 +265,7 @@ const App = {
           <td data-label="Expires">${member.expiryDate}</td>
           <td data-label="Status" class="hide-on-mobile"><span class="badge ${badgeClass}">${member.status}</span></td>
           <td data-action>
-            <a href="member.html" class="btn btn--ghost btn--sm">View &rarr;</a>
+            <a href="member.html?id=${member.id}" class="btn btn--ghost btn--sm">View &rarr;</a>
           </td>
         </tr>
       `;

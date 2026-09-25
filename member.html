@@ -7,7 +7,7 @@
   <title>Member Profile — GymPulse</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body style="display: none;">
   <div class="page">
 
     <!-- Navigation -->
@@ -35,6 +35,7 @@
           <a href="admin.html" class="nav__link" role="menuitem">Dashboard</a>
           <a href="members.html" class="nav__link" role="menuitem">Members</a>
           <a href="check-in.html" class="nav__link" role="menuitem">Check-in</a>
+          <a href="#" class="nav__link text-danger" role="menuitem" id="nav-logout">Logout</a>
         </div>
       </div>
     </nav>
@@ -110,6 +111,285 @@
 
   </div>
 
+  <dialog id="edit-modal" class="card" style="padding: 2rem; border-radius: var(--radius-lg); border: none; box-shadow: var(--shadow-lg); max-width: 400px; width: 100%; margin: auto;">
+    <div class="card__header" style="margin-bottom: 1.5rem;">
+      <h2 class="card__title">Edit Member</h2>
+    </div>
+    <form id="edit-form">
+      <div class="form-group mb-4">
+        <label class="form-label" for="edit-name">Full Name</label>
+        <input type="text" class="form-input" id="edit-name" required>
+      </div>
+      <div class="form-group mb-4">
+        <label class="form-label" for="edit-phone">Phone Number</label>
+        <input type="tel" class="form-input" id="edit-phone" required>
+      </div>
+      <div class="form-group mb-6">
+        <label class="form-label" for="edit-address">Address</label>
+        <textarea class="form-input" id="edit-address" rows="2"></textarea>
+      </div>
+      <div id="edit-error" class="form-error" style="display: none; margin-bottom: var(--space-4);"></div>
+      <div class="flex items-center justify-between" style="gap: var(--space-4);">
+        <button type="button" class="btn btn--ghost" id="btn-cancel-edit">Cancel</button>
+        <button type="submit" class="btn btn--primary" id="btn-save-edit">Save Changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/supabase-client.js"></script>
+  <script type="module" src="js/auth.js"></script>
   <script src="js/app.js"></script>
+  <script type="module">
+    import { Auth } from './js/auth.js';
+    Auth.requireAdmin().then(isAuthorized => {
+      if (!isAuthorized) return;
+      
+      document.getElementById('nav-logout').addEventListener('click', (e) => {
+        e.preventDefault();
+        Auth.logout();
+      });
+
+      // Fetch and display member details
+      const urlParams = new URLSearchParams(window.location.search);
+      const memberId = urlParams.get('id');
+      
+      const memberNameEl = document.getElementById('member-name');
+      const memberContactEl = document.getElementById('member-contact');
+      const memberAvatarEl = document.getElementById('member-avatar');
+      
+      if (!memberId) {
+        memberNameEl.textContent = 'Member Not Found';
+        memberContactEl.textContent = 'No member ID was provided in the URL.';
+        return;
+      }
+      
+      memberNameEl.textContent = 'Loading...';
+      memberContactEl.textContent = 'Fetching member details from the database...';
+      
+      (async function fetchMember() {
+        try {
+          const { data: member, error } = await window.supabaseClient
+            .from('members')
+            .select('*')
+            .eq('id', memberId)
+            .maybeSingle();
+            
+          if (error) throw error;
+          if (!member) throw new Error('The requested member does not exist.');
+          
+          // Display Name
+          memberNameEl.textContent = member.name || 'Unknown Member';
+          
+          // Display joining date
+          const joinedDateStr = member.joined_on || member.created_at;
+          const joinedDate = joinedDateStr ? new Date(joinedDateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown';
+          
+          // Display Contact and Address
+          let contactInfo = `Phone: ${member.phone || '—'} | Joined: ${joinedDate}`;
+          if (member.address) {
+             contactInfo += ` | Address: ${member.address}`;
+          }
+          memberContactEl.textContent = contactInfo;
+          
+          // Display Avatar or Photo
+          if (member.photo_url) {
+            const { data: signedData, error: signedError } = await window.supabaseClient
+              .storage
+              .from('member_photos')
+              .createSignedUrl(member.photo_url, 60 * 60); // 1 hour valid
+              
+            if (!signedError && signedData) {
+               memberAvatarEl.innerHTML = `<img src="${signedData.signedUrl}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+               memberAvatarEl.style.padding = '0';
+               memberAvatarEl.style.overflow = 'hidden';
+            } else {
+               memberAvatarEl.textContent = window.App ? window.App.getInitials(member.name) : member.name.charAt(0);
+            }
+          } else {
+             memberAvatarEl.textContent = window.App ? window.App.getInitials(member.name) : (member.name ? member.name.charAt(0) : '?');
+          }
+          
+          // Fetch and Display Membership
+          const { data: membership, error: membershipError } = await window.supabaseClient
+            .from('memberships')
+            .select(`
+              *,
+              membership_plans (
+                name,
+                duration_months
+              )
+            `)
+            .eq('member_id', memberId)
+            .order('end_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!membershipError && membership) {
+             const mEmpty = document.getElementById('membership-empty');
+             mEmpty.style.display = 'none';
+             
+             const planData = membership.membership_plans;
+             let planName = 'Unknown Plan';
+             if (planData) {
+                planName = planData.name || `${planData.duration_months} Months`;
+             }
+             
+             // Calculate dynamic status
+             const now = new Date();
+             now.setHours(0, 0, 0, 0); // normalize today to midnight
+             
+             const sDate = new Date(membership.start_date);
+             sDate.setHours(0, 0, 0, 0);
+             
+             const eDate = new Date(membership.end_date);
+             eDate.setHours(23, 59, 59, 999);
+             
+             let dynStatus = 'Active';
+             let badgeClass = 'badge--success';
+             if (now > eDate) {
+                dynStatus = 'Expired';
+                badgeClass = 'badge--danger';
+             } else if (now < sDate) {
+                dynStatus = 'Upcoming';
+                badgeClass = 'badge--neutral';
+             }
+             
+             const mDetails = document.createElement('div');
+             mDetails.className = 'grid-2 mt-4';
+             mDetails.innerHTML = `
+               <div style="margin-bottom: var(--space-4);">
+                 <p class="text-sm text-muted" style="margin-bottom: var(--space-1);">Plan</p>
+                 <p style="font-weight: 500;">${planName}</p>
+               </div>
+               <div style="margin-bottom: var(--space-4);">
+                 <p class="text-sm text-muted" style="margin-bottom: var(--space-1);">Status</p>
+                 <p><span class="badge ${badgeClass}">${dynStatus}</span></p>
+               </div>
+               <div style="margin-bottom: var(--space-4);">
+                 <p class="text-sm text-muted" style="margin-bottom: var(--space-1);">Start Date</p>
+                 <p style="font-weight: 500;">${new Date(membership.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+               </div>
+               <div style="margin-bottom: var(--space-4);">
+                 <p class="text-sm text-muted" style="margin-bottom: var(--space-1);">Expiry Date</p>
+                 <p style="font-weight: 500;">${new Date(membership.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+               </div>
+             `;
+             mEmpty.parentElement.appendChild(mDetails);
+          }
+          
+          // Enable action buttons
+          const btnEdit = document.getElementById('btn-edit-member');
+          const btnDelete = document.getElementById('btn-delete-member');
+          btnEdit.disabled = false;
+          btnDelete.disabled = false;
+          
+          // Edit & Delete Handlers
+          const editModal = document.getElementById('edit-modal');
+          const editForm = document.getElementById('edit-form');
+          const editError = document.getElementById('edit-error');
+          
+          btnEdit.addEventListener('click', () => {
+             document.getElementById('edit-name').value = member.name;
+             document.getElementById('edit-phone').value = member.phone || '';
+             document.getElementById('edit-address').value = member.address || '';
+             editError.style.display = 'none';
+             editModal.showModal();
+          });
+          
+          document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+             editModal.close();
+          });
+          
+          editForm.addEventListener('submit', async (e) => {
+             e.preventDefault();
+             editError.style.display = 'none';
+             const btnSave = document.getElementById('btn-save-edit');
+             btnSave.disabled = true;
+             btnSave.textContent = 'Saving...';
+             
+             const newName = document.getElementById('edit-name').value.trim();
+             const newPhone = document.getElementById('edit-phone').value.trim();
+             const newAddress = document.getElementById('edit-address').value.trim();
+             
+             try {
+                if (newPhone !== member.phone) {
+                   const { data: exist, error: checkErr } = await window.supabaseClient
+                     .from('members')
+                     .select('id')
+                     .eq('phone', newPhone)
+                     .neq('id', memberId)
+                     .maybeSingle();
+                   if (checkErr) throw checkErr;
+                   if (exist) throw new Error('Phone number is already used by another member.');
+                }
+                
+                const { error: updateErr } = await window.supabaseClient
+                  .from('members')
+                  .update({ name: newName, phone: newPhone, address: newAddress })
+                  .eq('id', memberId);
+                  
+                if (updateErr) throw updateErr;
+                
+                member.name = newName;
+                member.phone = newPhone;
+                member.address = newAddress;
+                
+                memberNameEl.textContent = member.name;
+                let contactInfo = `Phone: ${member.phone || '—'} | Joined: ${joinedDate}`;
+                if (member.address) {
+                   contactInfo += ` | Address: ${member.address}`;
+                }
+                memberContactEl.textContent = contactInfo;
+                
+                editModal.close();
+                alert('Member details updated successfully.');
+                
+             } catch (err) {
+                editError.textContent = err.message;
+                editError.style.display = 'block';
+             } finally {
+                btnSave.disabled = false;
+                btnSave.textContent = 'Save Changes';
+             }
+          });
+          
+          btnDelete.addEventListener('click', async () => {
+             const confirmed = window.confirm(`Are you sure you want to permanently delete ${member.name}?\n\nWarning: This action cannot be undone.`);
+             if (!confirmed) return;
+             
+             btnDelete.disabled = true;
+             btnDelete.textContent = 'Deleting...';
+             
+             try {
+                const { error: delErr } = await window.supabaseClient
+                  .from('members')
+                  .delete()
+                  .eq('id', memberId);
+                  
+                if (delErr) {
+                   if (delErr.code === '23503') {
+                      throw new Error('Cannot delete this member because they have existing membership or attendance records. You must remove those related records before deleting this member.');
+                   }
+                   throw delErr;
+                }
+                
+                alert('Member deleted successfully.');
+                window.location.href = 'members.html';
+                
+             } catch (err) {
+                alert(`Error deleting member:\n\n${err.message}`);
+                btnDelete.disabled = false;
+                btnDelete.textContent = 'Delete';
+             }
+          });
+          
+        } catch (err) {
+          memberNameEl.textContent = 'Error';
+          memberContactEl.textContent = err.message || 'Failed to load member profile.';
+          memberAvatarEl.textContent = '!';
+        }
+      })();
+    });
+  </script>
 </body>
 </html>

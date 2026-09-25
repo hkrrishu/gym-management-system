@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GymPulse Admin Login">
+  <title>Login — GymPulse</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page">
+    <main class="container container--narrow" style="margin-top: 15vh;">
+      <div class="card">
+        <div style="text-align: center; margin-bottom: var(--space-6);">
+          <div class="nav__logo" aria-hidden="true" style="margin: 0 auto var(--space-3); width: 48px; height: 48px; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; background: var(--color-primary); color: white; border-radius: 50%;">G</div>
+          <h1 class="card__title">Admin Login</h1>
+          <p class="text-secondary" style="margin-top: var(--space-2);">Sign in to manage GymPulse</p>
+        </div>
+
+        <form id="login-form">
+          <div class="form-group mb-4">
+            <label class="form-label" for="email">Email address</label>
+            <input type="email" class="form-input" id="email" required autocomplete="email" placeholder="admin@gympulse.com">
+          </div>
+          <div class="form-group mb-6">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" class="form-input" id="password" required autocomplete="current-password" placeholder="••••••••">
+          </div>
+          
+          <div id="login-error" class="form-error" style="display: none; margin-bottom: var(--space-4); text-align: center;"></div>
+          
+          <button type="submit" class="btn btn--primary btn--full btn--lg" id="btn-login">
+            Sign In
+          </button>
+        </form>
+      </div>
+      
+      <p class="text-center text-sm text-secondary mt-6">
+        <a href="index.html" class="nav__link">← Back to Home</a>
+      </p>
+    </main>
+  </div>
+
+  <script type="module" src="js/supabase-client.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module">
+    import { Auth } from './js/auth.js';
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('btn-login');
+      const err = document.getElementById('login-error');
+      
+      btn.textContent = 'Signing in...';
+      btn.disabled = true;
+      err.style.display = 'none';
+
+      try {
+        await Auth.login(email, password);
+        window.location.replace('admin.html');
+      } catch (error) {
+        err.textContent = error.message;
+        err.style.display = 'block';
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

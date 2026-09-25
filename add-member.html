@@ -7,7 +7,7 @@
   <title>Add Member — GymPulse</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body style="display: none;">
   <div class="page">
 
     <!-- Navigation -->
@@ -35,6 +35,7 @@
           <a href="admin.html" class="nav__link" role="menuitem">Dashboard</a>
           <a href="members.html" class="nav__link" role="menuitem">Members</a>
           <a href="check-in.html" class="nav__link" role="menuitem">Check-in</a>
+          <a href="#" class="nav__link text-danger" role="menuitem" id="nav-logout">Logout</a>
         </div>
       </div>
     </nav>
@@ -99,6 +100,38 @@
           <hr style="border: none; border-top: 1px solid var(--color-gray-200); margin: var(--space-6) 0;">
 
           <div class="card__header">
+            <h2 class="card__title">Profile Picture</h2>
+          </div>
+          
+          <div class="form-group" style="text-align: center;">
+            <div id="photo-preview-container" style="display: none; margin-bottom: var(--space-4);">
+              <img id="photo-preview" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 2px solid var(--color-primary); margin: 0 auto;">
+              <div class="mt-2 flex items-center justify-center gap-2">
+                <button type="button" class="btn btn--ghost btn--sm" id="btn-retake">Retake</button>
+              </div>
+            </div>
+            
+            <div id="camera-container" style="display: none; margin-bottom: var(--space-4);">
+              <video id="camera-stream" autoplay playsinline style="width: 100%; max-width: 300px; border-radius: var(--radius-md); margin: 0 auto; display: block;"></video>
+              <div class="mt-4 flex items-center justify-center gap-2">
+                <button type="button" class="btn btn--primary btn--sm" id="btn-capture">Capture Photo</button>
+                <button type="button" class="btn btn--ghost btn--sm" id="btn-cancel-camera">Cancel</button>
+              </div>
+            </div>
+            
+            <div id="photo-actions">
+              <button type="button" class="btn btn--outline" id="btn-open-camera">📸 Add Profile Picture</button>
+              <p class="text-sm text-danger mt-2" id="camera-error" style="display: none;"></p>
+              <div class="mt-2">
+                <label for="photo-upload" class="text-sm" style="cursor: pointer; text-decoration: underline; color: var(--color-primary);">Or upload an image</label>
+                <input type="file" id="photo-upload" accept="image/*" style="display: none;">
+              </div>
+            </div>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--color-gray-200); margin: var(--space-6) 0;">
+
+          <div class="card__header">
             <h2 class="card__title">Membership Details</h2>
           </div>
 
@@ -125,16 +158,15 @@
             <textarea class="form-textarea" id="notes" name="notes" placeholder="Any additional notes about this member..." rows="3"></textarea>
           </div>
 
+          <div id="form-error" class="form-error" style="display: none; margin-top: var(--space-4); text-align: center;"></div>
+
           <!-- Actions -->
           <div class="flex items-center justify-between mt-8" style="flex-wrap: wrap; gap: var(--space-4);">
             <a href="members.html" class="btn btn--ghost" id="btn-cancel">Cancel</a>
-            <button type="submit" class="btn btn--primary btn--lg" id="btn-save-member" disabled>
+            <button type="submit" class="btn btn--primary btn--lg" id="btn-save-member">
               Save Member
             </button>
           </div>
-          <p class="form-hint mt-4 text-center">
-            Form submission will be enabled once the database is connected.
-          </p>
         </form>
 
       </div>
@@ -150,6 +182,223 @@
 
   </div>
 
+  <script type="module" src="js/supabase-client.js"></script>
+  <script type="module" src="js/auth.js"></script>
   <script src="js/app.js"></script>
+  <script type="module">
+    import { Auth } from './js/auth.js';
+    
+    Auth.requireAdmin().then(async isAuthorized => {
+      if (!isAuthorized) return;
+      
+      document.getElementById('nav-logout').addEventListener('click', (e) => {
+        e.preventDefault();
+        Auth.logout();
+      });
+      
+      // Load Membership Plans
+      const planSelect = document.getElementById('plan');
+      planSelect.innerHTML = '<option value="" disabled selected>Loading plans...</option>';
+      try {
+        const { data: plans, error: planError } = await window.supabaseClient
+          .from('membership_plans')
+          .select('*')
+          .order('duration_months');
+          
+        if (planError) throw planError;
+        
+        if (plans && plans.length > 0) {
+          planSelect.innerHTML = '<option value="" disabled selected>Select plan</option>';
+          window.gymPlans = plans; 
+          plans.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p.id;
+            option.textContent = p.name || `${p.duration_months} Months`;
+            planSelect.appendChild(option);
+          });
+        } else {
+          planSelect.innerHTML = '<option value="" disabled selected>No plans available</option>';
+        }
+      } catch (e) {
+        planSelect.innerHTML = '<option value="" disabled selected>Error loading plans</option>';
+      }
+
+      // Photo Capture Logic
+      const video = document.getElementById('camera-stream');
+      const canvas = document.createElement('canvas');
+      let photoBlob = null;
+      let stream = null;
+
+      document.getElementById('btn-open-camera').addEventListener('click', async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+          video.srcObject = stream;
+          document.getElementById('photo-actions').style.display = 'none';
+          document.getElementById('camera-container').style.display = 'block';
+          document.getElementById('camera-error').style.display = 'none';
+        } catch (err) {
+          const errEl = document.getElementById('camera-error');
+          errEl.textContent = 'Camera access denied or unavailable. Please use the upload option.';
+          errEl.style.display = 'block';
+        }
+      });
+
+      function stopCamera() {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
+        document.getElementById('camera-container').style.display = 'none';
+      }
+
+      document.getElementById('btn-cancel-camera').addEventListener('click', () => {
+        stopCamera();
+        document.getElementById('photo-actions').style.display = 'block';
+      });
+
+      document.getElementById('btn-capture').addEventListener('click', () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        canvas.toBlob(blob => {
+          photoBlob = blob;
+          const url = URL.createObjectURL(blob);
+          document.getElementById('photo-preview').src = url;
+          
+          stopCamera();
+          document.getElementById('photo-preview-container').style.display = 'block';
+        }, 'image/jpeg', 0.8);
+      });
+
+      document.getElementById('btn-retake').addEventListener('click', () => {
+        photoBlob = null;
+        document.getElementById('photo-preview-container').style.display = 'none';
+        document.getElementById('photo-actions').style.display = 'block';
+      });
+
+      document.getElementById('photo-upload').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          photoBlob = file;
+          const url = URL.createObjectURL(file);
+          document.getElementById('photo-preview').src = url;
+          
+          document.getElementById('photo-actions').style.display = 'none';
+          document.getElementById('photo-preview-container').style.display = 'block';
+        }
+      });
+
+      // Form Submission Logic
+      const form = document.getElementById('add-member-form');
+      const errorDiv = document.getElementById('form-error');
+      const submitBtn = document.getElementById('btn-save-member');
+      
+      let createdMemberId = null;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const firstName = document.getElementById('first-name').value.trim();
+        const lastName = document.getElementById('last-name').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const startDate = document.getElementById('start-date').value;
+        const planId = document.getElementById('plan').value;
+        
+        errorDiv.style.display = 'none';
+        
+        if (!firstName || !lastName || !phone || !startDate || !planId) {
+          errorDiv.textContent = 'Please fill out all required fields, including the membership plan.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        
+        try {
+          if (!createdMemberId) {
+            // 1. Check for duplicate phone number
+            const { data: existingMember, error: checkError } = await window.supabaseClient
+              .from('members')
+              .select('id')
+              .eq('phone', phone)
+              .maybeSingle();
+              
+            if (checkError) throw new Error('Failed to verify phone number.');
+            
+            if (existingMember) {
+               throw new Error('A member with this phone number already exists.');
+            }
+
+            // 2. Upload photo if present
+            let photo_url = null;
+            if (photoBlob) {
+              const ext = photoBlob.type === 'image/jpeg' ? 'jpg' : 'png';
+              const fileName = `${phone}_${Date.now()}.${ext}`;
+              const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
+                .from('member_photos')
+                .upload(fileName, photoBlob);
+                
+              if (uploadError) {
+                throw new Error(`Photo upload failed: ${uploadError.message}`);
+              }
+              photo_url = uploadData.path;
+            }
+
+            // 3. Insert member
+            const name = `${firstName} ${lastName}`;
+            const { data: newMember, error: insertError } = await window.supabaseClient
+              .from('members')
+              .insert([
+                {
+                  name,
+                  phone,
+                  joined_on: startDate,
+                  photo_url
+                }
+              ])
+              .select('id')
+              .single();
+              
+            if (insertError) throw new Error(`Failed to save member: ${insertError.message}`);
+            createdMemberId = newMember.id;
+          }
+          
+          // 4. Insert membership
+          const selectedPlan = window.gymPlans.find(p => p.id == planId);
+          if (selectedPlan) {
+            const start = new Date(startDate);
+            start.setMonth(start.getMonth() + selectedPlan.duration_months);
+            const expiryDate = start.toISOString().split('T')[0];
+            
+            const { error: membershipError } = await window.supabaseClient
+              .from('memberships')
+              .insert([{
+                member_id: createdMemberId,
+                plan_id: planId,
+                plan_name: selectedPlan.name || `${selectedPlan.duration_months} Months`,
+                duration_months: selectedPlan.duration_months,
+                start_date: startDate,
+                end_date: expiryDate
+              }]);
+              
+            if (membershipError) {
+               throw new Error(`Member saved, but membership assignment failed: ${membershipError.message}. Please retry.`);
+            }
+          }
+          
+          // Success: redirect to members page
+          window.location.href = 'members.html';
+          
+        } catch (err) {
+          errorDiv.textContent = err.message;
+          errorDiv.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = createdMemberId ? 'Retry Membership' : 'Save Member';
+        }
+      });
+    });
+  </script>
 </body>
 </html>
