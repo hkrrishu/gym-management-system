@@ -98,22 +98,9 @@
   <script src="js/app.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // Demo Data
-      const demoMembers = [
-        { name: "Rahul Kumar", phone: "9876543210", expiryDate: "2026-09-22", status: "Expired" },
-        { name: "Aman Singh", phone: "9876543211", expiryDate: "2026-09-20", status: "Expired" },
-        { name: "Rohit Sharma", phone: "9876543212", expiryDate: "2026-10-18", status: "Active" },
-        { name: "Arjun Singh", phone: "9876543213", expiryDate: "2026-10-20", status: "Active" },
-        { name: "Vikas Kumar", phone: "9876543214", expiryDate: "2026-10-18", status: "Active" },
-        { name: "Priya Sharma", phone: "9876543215", expiryDate: "2027-09-22", status: "Active" },
-        { name: "Neha Gupta", phone: "9876543216", expiryDate: "2026-09-25", status: "Expiring Soon" },
-        { name: "Karan Singh", phone: "9876543217", expiryDate: "2026-09-28", status: "Expiring Soon" },
-        { name: "Saurabh Verma", phone: "9876543218", expiryDate: "2026-10-15", status: "Active" },
-        { name: "Anjali Singh", phone: "9876543219", expiryDate: "2026-09-05", status: "Expired" }
-      ];
-
-      const checkedInToday = new Set();
-      let currentMember = null;
+      let currentMemberPhone = null;
+      let isSearching = false;
+      let isMarkingPresent = false;
 
       const elements = {
         searchState: document.getElementById('checkin-search-state'),
@@ -138,8 +125,11 @@
       };
 
       function calculateDaysRemaining(expiryStr) {
-        const today = new Date('2026-09-25'); // Using fixed current date to match demo context
+        if (!expiryStr) return null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const expiry = new Date(expiryStr);
+        expiry.setHours(23, 59, 59, 999);
         const diffTime = expiry - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays;
@@ -160,10 +150,20 @@
         elements.expiredArea.style.display = 'none';
         elements.successArea.style.display = 'none';
         elements.alreadyCheckedInArea.style.display = 'none';
+        
+        currentMemberPhone = null;
+        isSearching = false;
+        isMarkingPresent = false;
+        elements.btnFind.textContent = 'Find My Membership';
+        elements.btnFind.disabled = false;
+        elements.btnMarkPresent.textContent = 'Mark Present';
+        elements.btnMarkPresent.disabled = false;
       }
 
-      elements.btnFind.addEventListener('click', () => {
-        const phone = elements.phoneInput.value.trim();
+      elements.btnFind.addEventListener('click', async () => {
+        if (isSearching) return;
+        
+        const phone = elements.phoneInput.value.replace(/\s+/g, '');
 
         if (!phone || phone.length !== 10 || !/^\d+$/.test(phone)) {
           elements.errorMsg.textContent = 'Please enter a valid 10-digit phone number.';
@@ -171,70 +171,135 @@
           return;
         }
 
-        const member = demoMembers.find(m => m.phone === phone);
-
-        if (!member) {
-          elements.errorMsg.textContent = 'Membership not found for this number.';
-          elements.errorMsg.style.display = 'block';
-          return;
-        }
-
-        currentMember = member;
-
-        // Found member
         elements.errorMsg.style.display = 'none';
-        elements.searchState.style.display = 'none';
-        elements.resultState.style.display = 'block';
+        isSearching = true;
+        elements.btnFind.textContent = 'Searching...';
+        elements.btnFind.disabled = true;
 
-        // Populate card
-        elements.avatar.textContent = App.getInitials(member.name);
-        elements.name.textContent = member.name;
-        elements.phone.textContent = maskPhone(member.phone);
-        elements.expiry.textContent = App.formatDate(member.expiryDate);
+        try {
+          const { data, error } = await window.supabaseClient.rpc('lookup_member_for_checkin', { search_phone: phone });
+          
+          if (error || !data || data.length === 0) {
+            elements.errorMsg.textContent = 'Membership not found for this number.';
+            elements.errorMsg.style.display = 'block';
+            isSearching = false;
+            elements.btnFind.textContent = 'Find My Membership';
+            elements.btnFind.disabled = false;
+            return;
+          }
 
-        const days = calculateDaysRemaining(member.expiryDate);
-        if (days < 0) {
-          elements.days.textContent = Math.abs(days) + ' days ago';
-        } else if (days === 0) {
-          elements.days.textContent = 'Expires today';
-        } else {
-          elements.days.textContent = days + ' days remaining';
-        }
+          const member = data[0];
+          currentMemberPhone = member.member_phone;
 
-        elements.badge.textContent = member.status;
-        elements.badge.className = 'badge';
-        if (member.status === 'Active') elements.badge.classList.add('badge--success');
-        if (member.status === 'Expiring Soon') elements.badge.classList.add('badge--warning');
-        if (member.status === 'Expired') elements.badge.classList.add('badge--danger');
+          // Found member
+          elements.searchState.style.display = 'none';
+          elements.resultState.style.display = 'block';
 
-        // Logic
-        elements.actionArea.style.display = 'none';
-        elements.expiredArea.style.display = 'none';
-        elements.successArea.style.display = 'none';
-        elements.alreadyCheckedInArea.style.display = 'none';
+          // Populate card
+          if (member.photo_path) {
+            const { data: signedData } = await window.supabaseClient.storage.from('member_photos').createSignedUrl(member.photo_path, 60);
+            if (signedData) {
+              elements.avatar.innerHTML = `<img src="${signedData.signedUrl}" alt="${member.member_name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+              elements.avatar.style.padding = '0';
+              elements.avatar.style.overflow = 'hidden';
+            } else {
+              elements.avatar.textContent = App.getInitials(member.member_name);
+            }
+          } else {
+            elements.avatar.textContent = App.getInitials(member.member_name);
+          }
+          
+          elements.name.textContent = member.member_name;
+          elements.phone.textContent = maskPhone(member.member_phone);
+          elements.expiry.textContent = App.formatDate(member.end_date);
 
-        if (checkedInToday.has(member.phone)) {
-          elements.alreadyCheckedInArea.style.display = 'block';
-        } else if (member.status === 'Expired') {
-          elements.expiredArea.style.display = 'block';
-        } else {
-          elements.actionArea.style.display = 'block';
+          const days = calculateDaysRemaining(member.end_date);
+          let status = 'No Membership';
+          
+          if (days === null) {
+            elements.days.textContent = 'No membership on file';
+          } else if (days < 0) {
+            elements.days.textContent = Math.abs(days) + ' days ago';
+            status = 'Expired';
+          } else if (days === 0) {
+            elements.days.textContent = 'Expires today';
+            status = 'Expiring Soon';
+          } else {
+            elements.days.textContent = days + ' days remaining';
+            status = days <= 7 ? 'Expiring Soon' : 'Active';
+          }
+          
+          // If not started yet
+          if (member.start_date && new Date(member.start_date) > new Date()) {
+             status = 'Upcoming';
+          }
+
+          elements.badge.textContent = status;
+          elements.badge.className = 'badge';
+          if (status === 'Active') elements.badge.classList.add('badge--success');
+          else if (status === 'Expiring Soon') elements.badge.classList.add('badge--warning');
+          else if (status === 'Expired') elements.badge.classList.add('badge--danger');
+          else elements.badge.classList.add('badge--neutral');
+
+          // Logic
+          elements.actionArea.style.display = 'none';
+          elements.expiredArea.style.display = 'none';
+          elements.successArea.style.display = 'none';
+          elements.alreadyCheckedInArea.style.display = 'none';
+
+          if (member.has_checked_in_today) {
+            elements.alreadyCheckedInArea.style.display = 'block';
+          } else if (status === 'Expired' || status === 'No Membership' || status === 'Upcoming') {
+            elements.expiredArea.style.display = 'block';
+          } else {
+            elements.actionArea.style.display = 'block';
+          }
+        } catch (err) {
+          elements.errorMsg.textContent = 'An error occurred. Please try again.';
+          elements.errorMsg.style.display = 'block';
+          console.error(err);
+        } finally {
+          isSearching = false;
+          elements.btnFind.textContent = 'Find My Membership';
+          elements.btnFind.disabled = false;
         }
       });
 
-      elements.btnMarkPresent.addEventListener('click', () => {
-        if (currentMember) {
-          checkedInToday.add(currentMember.phone);
-        }
-        elements.actionArea.style.display = 'none';
-        elements.successArea.style.display = 'block';
+      elements.btnMarkPresent.addEventListener('click', async () => {
+        if (!currentMemberPhone || isMarkingPresent) return;
+        
+        isMarkingPresent = true;
+        elements.btnMarkPresent.textContent = 'Marking...';
+        elements.btnMarkPresent.disabled = true;
 
-        // Auto go back after 3 seconds
-        setTimeout(() => {
-          if (elements.successArea.style.display === 'block') {
+        try {
+          const { data, error } = await window.supabaseClient.rpc('mark_member_present', { search_phone: currentMemberPhone });
+          
+          if (error) throw error;
+          
+          if (data === 'success') {
+            elements.actionArea.style.display = 'none';
+            elements.successArea.style.display = 'block';
+            setTimeout(() => {
+              if (elements.successArea.style.display === 'block') {
+                resetUI();
+              }
+            }, 3000);
+          } else if (data === 'already_present') {
+            elements.actionArea.style.display = 'none';
+            elements.alreadyCheckedInArea.style.display = 'block';
+          } else {
+            alert('Cannot mark attendance. Membership may be expired or invalid.');
             resetUI();
           }
-        }, 3000);
+        } catch (err) {
+          console.error(err);
+          alert('Failed to mark attendance. Please try again.');
+          elements.btnMarkPresent.textContent = 'Mark Present';
+          elements.btnMarkPresent.disabled = false;
+        } finally {
+          isMarkingPresent = false;
+        }
       });
 
       elements.btnBack.addEventListener('click', () => {

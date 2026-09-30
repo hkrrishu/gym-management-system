@@ -96,6 +96,28 @@
               Check-in history will appear here once the attendance system is connected.
             </p>
           </div>
+
+          <div id="attendance-calendar-container" style="display: none; margin-top: 1rem;">
+            <div class="flex" style="justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <button class="btn btn--ghost btn--sm" id="btn-prev-month">← Prev</button>
+              <h3 class="card__title" id="calendar-month-year" style="margin: 0; font-size: 1.1rem;"></h3>
+              <button class="btn btn--ghost btn--sm" id="btn-next-month">Next →</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; text-align: center; font-size: 0.8rem; font-weight: bold; color: var(--text-muted); margin-bottom: 0.5rem;">
+              <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+            </div>
+            <div id="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+              <!-- Calendar days will be injected here -->
+            </div>
+            <div class="flex" style="justify-content: space-between; align-items: center; font-size: 0.875rem; color: var(--text-secondary); flex-wrap: wrap; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+              <div id="attendance-summary" style="font-weight: 500;">Present: 0 | Attendance: 0%</div>
+              <div class="flex" style="gap: 0.75rem;">
+                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="display: inline-block; width: 10px; height: 10px; background: var(--color-success); border-radius: 50%;"></span> Present</span>
+                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="display: inline-block; width: 10px; height: 10px; background: var(--color-danger); border-radius: 50%;"></span> Absent</span>
+                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="display: inline-block; width: 10px; height: 10px; background: #e2e8f0; border-radius: 50%;"></span> N/A</span>
+              </div>
+            </div>
+          </div>
         </section>
 
       </div>
@@ -209,26 +231,22 @@
              memberAvatarEl.textContent = window.App ? window.App.getInitials(member.name) : (member.name ? member.name.charAt(0) : '?');
           }
           
-          // Fetch and Display Membership
-          const { data: membership, error: membershipError } = await window.supabaseClient
+          // Fetch ALL memberships for attendance calculations
+          const { data: allMemberships, error: allMsError } = await window.supabaseClient
             .from('memberships')
-            .select(`
-              *,
-              membership_plans (
-                name,
-                duration_months
-              )
-            `)
+            .select(`*, membership_plans (name, duration_months)`)
             .eq('member_id', memberId)
-            .order('end_date', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .order('end_date', { ascending: false });
+            
+          if (allMsError) console.error(allMsError);
+          const memberMemberships = allMemberships || [];
+          const latestMembership = memberMemberships.length > 0 ? memberMemberships[0] : null;
 
-          if (!membershipError && membership) {
+          if (latestMembership) {
              const mEmpty = document.getElementById('membership-empty');
              mEmpty.style.display = 'none';
              
-             const planData = membership.membership_plans;
+             const planData = latestMembership.membership_plans;
              let planName = 'Unknown Plan';
              if (planData) {
                 planName = planData.name || `${planData.duration_months} Months`;
@@ -238,10 +256,10 @@
              const now = new Date();
              now.setHours(0, 0, 0, 0); // normalize today to midnight
              
-             const sDate = new Date(membership.start_date);
+             const sDate = new Date(latestMembership.start_date);
              sDate.setHours(0, 0, 0, 0);
              
-             const eDate = new Date(membership.end_date);
+             const eDate = new Date(latestMembership.end_date);
              eDate.setHours(23, 59, 59, 999);
              
              let dynStatus = 'Active';
@@ -267,15 +285,161 @@
                </div>
                <div style="margin-bottom: var(--space-4);">
                  <p class="text-sm text-muted" style="margin-bottom: var(--space-1);">Start Date</p>
-                 <p style="font-weight: 500;">${new Date(membership.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                 <p style="font-weight: 500;">${new Date(latestMembership.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                </div>
                <div style="margin-bottom: var(--space-4);">
                  <p class="text-sm text-muted" style="margin-bottom: var(--space-1);">Expiry Date</p>
-                 <p style="font-weight: 500;">${new Date(membership.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                 <p style="font-weight: 500;">${new Date(latestMembership.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                </div>
              `;
              mEmpty.parentElement.appendChild(mDetails);
           }
+
+          // Fetch Attendance Data
+          const attendanceRecords = new Set();
+          const { data: attData, error: attError } = await window.supabaseClient
+            .from('attendance')
+            .select('attendance_date')
+            .eq('member_id', memberId);
+            
+          if (!attError && attData) {
+             attData.forEach(r => attendanceRecords.add(r.attendance_date));
+          }
+
+          document.getElementById('attendance-empty').style.display = 'none';
+          document.getElementById('attendance-calendar-container').style.display = 'block';
+
+          // Calendar Logic (India Local Dates)
+          function getISTDate(dateObj) {
+            return new Date(dateObj.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+          }
+          function toISODate(dateObj) {
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+
+          const todayIST = getISTDate(new Date());
+          const todayISO = toISODate(todayIST);
+          
+          let currentMonth = todayIST.getMonth();
+          let currentYear = todayIST.getFullYear();
+
+          function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById('calendar-month-year').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const startDayOfWeek = firstDay.getDay(); // 0 (Sun) to 6 (Sat)
+            const daysInMonth = lastDay.getDate();
+            
+            // Fill empty slots before day 1
+            for (let i = 0; i < startDayOfWeek; i++) {
+              const emptyDiv = document.createElement('div');
+              grid.appendChild(emptyDiv);
+            }
+            
+            let presentCount = 0;
+            let activeDaysCount = 0;
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+              const dateObj = new Date(currentYear, currentMonth, day);
+              const dateStr = toISODate(dateObj); // YYYY-MM-DD
+              
+              // Check if covered by any membership
+              let isCovered = false;
+              for (const ms of memberMemberships) {
+                if (dateStr >= ms.start_date && dateStr <= ms.end_date) {
+                  isCovered = true;
+                  break;
+                }
+              }
+              
+              const isPastOrToday = dateStr <= todayISO;
+              const isPresent = attendanceRecords.has(dateStr);
+              
+              let circleColor = '#e2e8f0'; // Gray (Future or not covered)
+              let textColor = '#64748b';
+              
+              if (isCovered && isPastOrToday) {
+                activeDaysCount++;
+                if (isPresent) {
+                  circleColor = 'var(--color-success)'; // Green
+                  textColor = 'white';
+                  presentCount++;
+                } else {
+                  circleColor = 'var(--color-danger)'; // Red
+                  textColor = 'white';
+                }
+              } else if (isPresent) {
+                circleColor = 'var(--color-success)';
+                textColor = 'white';
+                presentCount++;
+                activeDaysCount++;
+              }
+              
+              const dayDiv = document.createElement('div');
+              dayDiv.style.display = 'flex';
+              dayDiv.style.alignItems = 'center';
+              dayDiv.style.justifyContent = 'center';
+              
+              const circle = document.createElement('div');
+              circle.style.width = '32px';
+              circle.style.height = '32px';
+              circle.style.borderRadius = '50%';
+              circle.style.display = 'flex';
+              circle.style.alignItems = 'center';
+              circle.style.justifyContent = 'center';
+              circle.style.background = circleColor;
+              circle.style.color = textColor;
+              circle.style.fontWeight = '500';
+              circle.style.fontSize = '0.9rem';
+              circle.textContent = day;
+              
+              dayDiv.appendChild(circle);
+              grid.appendChild(dayDiv);
+            }
+            
+            const percentage = activeDaysCount > 0 ? Math.round((presentCount / activeDaysCount) * 100) : 0;
+            document.getElementById('attendance-summary').textContent = `Present: ${presentCount} | Attendance: ${percentage}%`;
+          }
+
+          document.getElementById('btn-prev-month').addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+              currentMonth = 11;
+              currentYear--;
+            }
+            renderCalendar();
+          });
+
+          document.getElementById('btn-next-month').addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+              currentMonth = 0;
+              currentYear++;
+            }
+            renderCalendar();
+          });
+
+          renderCalendar();
+
+          // Setup Realtime Subscription
+          window.supabaseClient.channel('attendance_changes')
+            .on(
+              'postgres_changes',
+              { event: 'INSERT', schema: 'public', table: 'attendance', filter: `member_id=eq.${memberId}` },
+              (payload) => {
+                attendanceRecords.add(payload.new.attendance_date);
+                renderCalendar();
+              }
+            )
+            .subscribe();
           
           // Enable action buttons
           const btnEdit = document.getElementById('btn-edit-member');
